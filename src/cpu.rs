@@ -1,14 +1,16 @@
 // non_snake_case allowed for I and V registers
 #[allow(non_snake_case)]
+use macroquad::prelude::*;
 pub struct Cpu {
     memory: [u8; 4096],
-    pc: u16,
+    pc: usize,
     I: u16,
     stack: [u16; 12],
     delay_timer: u8,
     sound_timer: u8,
     V: [u8; 16],
     keypad: [bool; 16],
+    display: [[bool; 32]; 64],
 }
 
 impl Cpu {
@@ -22,6 +24,7 @@ impl Cpu {
             sound_timer: 0,
             V: [0; 16],
             keypad: [false; 16],
+            display: [[false; 32]; 64],
         }
     }
 
@@ -54,6 +57,19 @@ impl Cpu {
         }
 
         return cpu;
+    }
+    pub fn get_display(&self) -> &[[bool; 32]; 64] {
+        return &self.display;
+    }
+    // REMOVE
+    pub fn modify_display(&mut self) {
+        for i in 0..self.display.len() {
+            for j in 0..self.display[i].len() {
+                if (i + j) % 2 == 0 {
+                    self.display[i][j] = true;
+                }
+            }
+        }
     }
     pub fn update_keypad_state(&mut self) {
         use macroquad::input::KeyCode as KeyCode;
@@ -106,6 +122,23 @@ impl Cpu {
         }
         if is_key_down(KeyCode::V) {
             self.keypad[15] = true;
+        }
+    }
+
+    pub fn fetch_instruction(&mut self, rom: &[u8]) -> u16 {
+        let bytes: [u8; 2] = [rom[self.pc], rom[self.pc + 1]];
+        let result: u16 = ((bytes[0] as u16) << 8) | (bytes[1] as u16);
+        self.pc += 2;
+        return result;
+    }
+
+    pub fn decode(&mut self, instr: u16) {
+        match (instr >> 12) & 0xF {
+            0x0 => match (instr >> 4) & 0x0FFF {
+                0x0E0 => scene::clear(),
+                _ => todo!(),
+            }
+            _ => todo!(),
         }
     }
 }
