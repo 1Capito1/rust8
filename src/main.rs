@@ -9,25 +9,25 @@ use std::io::Read;
 async fn main() -> std::io::Result<()> {
     let config = config::Config::default();
     let mut cpu = cpu::Cpu::init();
-    let mut f = File::open("BC_test.ch8")?;
+    let mut f = File::open("IBMLogo.ch8")?;
     let mut rom: Vec<u8> = Vec::new();
     let bytes_read = f.read_to_end(&mut rom)?;
     if bytes_read == 0 {
         panic!("Empty File");
     }
     request_new_screen_size(config.get_scaled_width(), config.get_scaled_height());
-    // TEST
-    cpu.modify_display();
     while !(is_key_pressed(KeyCode::Escape) || macroquad::input::is_quit_requested()) {
         clear_background(BLACK);
-        draw(&cpu, &config);
         cpu.update_keypad_state();
         // Fetch instruction from memory at current PC
         let instruction = cpu.fetch_instruction(&rom);
-        // Decode the instruction
-        cpu.decode(instruction);
+        // Decode the instruction and execute
+        cpu.decode(instruction, &config);
 
-        // Execute instruction
+        if cpu.will_draw() {
+            draw(&cpu, &config);
+        }
+
 
         next_frame().await
     }
