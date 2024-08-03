@@ -11,21 +11,19 @@ async fn main() -> std::io::Result<()> {
     let mut cpu = cpu::Cpu::init();
     let mut f = File::open("IBMLogo.ch8")?;
     let mut rom: Vec<u8> = Vec::new();
-    let bytes_read = f.read_to_end(&mut rom)?;
-    if bytes_read == 0 {
-        panic!("Empty File");
-    }
+    let _ = f.read_to_end(&mut rom)?;
+    cpu.load_rom(&rom).expect("File size 0");
     request_new_screen_size(config.get_scaled_width(), config.get_scaled_height());
+    clear_background(BLACK);
     while !(is_key_pressed(KeyCode::Escape) || macroquad::input::is_quit_requested()) {
-        clear_background(BLACK);
         cpu.update_keypad_state();
         // Fetch instruction from memory at current PC
-        let instruction = cpu.fetch_instruction(&rom);
+        let instruction = cpu.fetch_instruction();
         // Decode the instruction and execute
         cpu.decode(instruction, &config);
 
         if cpu.will_draw() {
-            draw(&cpu, &config);
+            draw(&mut cpu, &config);
         }
 
 
@@ -34,12 +32,19 @@ async fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn draw(cpu: &cpu::Cpu, config: &config::Config) {
-    for (i, _) in cpu.get_display().iter().enumerate() {
-        for (j, _) in cpu.get_display()[i].iter().enumerate() {
-            if cpu.get_display()[i][j] {
-                let point = vec2::Vec2::create_point(i as f32, j as f32, config);
-                draw_rectangle(point.x, point.y, config.scale_factor, config.scale_factor, WHITE);
+fn draw(cpu: &mut cpu::Cpu, config: &config::Config) {
+    // Get the display data once
+    let display = cpu.get_display();
+
+    // Iterate over display pixels
+    for (i, row) in display.iter().enumerate() {
+        for (j, &pixel_on) in row.iter().enumerate() {
+            if pixel_on {
+                // Create point for drawing
+                let v = vec2::Vec2::create_point(j as f32, i as f32, config);
+
+                // Draw rectangle representing the pixel
+                draw_rectangle(v.y, v.x, config.scale_factor, config.scale_factor, WHITE);
             }
         }
     }
