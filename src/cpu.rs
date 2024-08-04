@@ -186,7 +186,7 @@ impl Cpu {
             0x7 => {
                 // 0x7XNN: add NN to VX
                 let vx: usize = (instr >> 8) as usize & 0xF;
-                self.V[vx] += (instr & 0xFF) as u8;
+                self.V[vx] = self.V[vx].overflowing_add((instr & 0xFF) as u8).0;
             },
             0x8 => {
                 // Logic & Arithmetic instructions
@@ -349,6 +349,73 @@ impl Cpu {
                             self.pc += 2;
                         }
                     },
+                    0xF => {
+                        let bitmask = instr & 0xFF;
+                        match bitmask {
+                            0x07 => {
+                                // FX07: V[X] = delay_timer
+                                let x = (instr >> 8) as usize & 0xF;
+                                self.V[x] = self.delay_timer;
+                            },
+                            0x15 => {
+                                // FX15: delay_timer = V[X]
+                                let x = (instr >> 8) as usize & 0xF;
+                                self.delay_timer = self.V[x];
+                            },
+                            0x18 => {
+                                // FX18: sound_timer = VX
+                                let x = (instr >> 8) as usize & 0xF;
+                                self.sound_timer = self.V[x];
+                            },
+                            0x1E => {
+                                // FX1E: I += V[X]
+                                let x = (instr >> 8) as usize & 0xF;
+                                self.I += self.V[x] as u16;
+                            },
+                            0x0A => {
+                                // FX0A: VX = get_key(); Await until a keypress and store in VX
+                                let x = (instr >> 8) as usize & 0xF;
+                                let mut any_key_pressed = false;
+                                for (i, _) in self.keypad.iter().enumerate() {
+                                    if self.keypad[i] {
+                                        self.V[x] = i as u8;
+                                        any_key_pressed = true;
+                                        break;
+                                    }
+                                }
+                                if !any_key_pressed {
+                                    self.pc -= 2;
+                                }
+
+                            },
+                            0x29 => {
+                                // FX29: I = V[X] * 5
+                                let x = (instr >> 8) as usize & 0xF;
+                                self.I = self.V[x] as u16 * 5;
+                            },
+                            0x33 => {
+                                // FX33: VX -> three decimal digits, stored at memory[I]
+                                let x = (instr >> 8) as usize & 0xF;
+                                self.memory[self.I as usize + 2] = self.V[x] % 10;
+                                self.memory[self.I as usize + 1] = self.V[x] / 10 % 10;
+                                self.memory[self.I as usize] = self.V[x] / 10 / 10 % 10;
+                            },
+                            0x55 => {
+                                // FX55: V0 -> VX stored in memory[I] -> memory[I+X]
+                                let x = (instr >> 8) as usize & 0xF;
+                                for i in 0..=x {
+                                    self.memory[self.I as usize + i] = self.V[i];
+                                }
+                            },
+                            0x65 => {
+                                let x = (instr >> 8) as usize & 0xF;
+                                for i in 0..=x {
+                                    self.V[i] = self.memory[self.I as usize + i];
+                                }
+                            },
+                            _ => panic!("Opcode does not exist"),
+                        }
+                    }
                     _ => panic!("opcode does not exist"),
                 }
             }

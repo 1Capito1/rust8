@@ -9,7 +9,7 @@ use std::io::Read;
 async fn main() -> std::io::Result<()> {
     let config = config::Config::default();
     let mut cpu = cpu::Cpu::init();
-    let mut f = File::open("src/roms/BC_test.ch8")?;
+    let mut f = File::open("src/roms/test_opcode.ch8")?;
     let mut rom: Vec<u8> = Vec::new();
     let _ = f.read_to_end(&mut rom)?;
     cpu.load_rom(&rom).expect("File size 0");
