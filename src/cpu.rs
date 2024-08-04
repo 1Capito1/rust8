@@ -1,5 +1,6 @@
 // non_snake_case allowed for I and V registers
 use macroquad::prelude::*;
+use crate::vec2::Vec2;
 
 #[allow(non_snake_case)]
 #[allow(dead_code)]
@@ -288,14 +289,15 @@ impl Cpu {
             },
             0xB => {
                 // TODO: When implementing configuration, add the legacy version of this opcode
-                
+
                 // BNNN: PC += V0 + NNN
                 self.pc += (self.V[0] as u16 + (instr & 0xFFF)) as usize;
             },
             0xC => {
                 // CXNN: VX = RandNum & NN
                 let x = (instr >> 8) as usize & 0xF;
-                // TODO: self.V[x] = u8::rand
+                let nn = instr & 0xFF;
+                self.V[x] = rand::gen_range(0, u8::MAX) & nn as u8;
             }
             0xD => {
                 let x = (instr >> 8) as usize & 0xF;
@@ -325,8 +327,32 @@ impl Cpu {
                     y_coord = (y_coord + 1) % config.get_raw_height() as usize; // Wrap around
                 }
                 self.set_draw(true);
+            },
+            0xE => {
+                let bitmask = instr & 0xFF;
+                match bitmask {
+                    0x9E => {
+                        // EX9E: if key in V[X] is pressed; pc += 2
+                        let x = (instr >> 8) as usize & 0xF;
+                        let key_code = self.V[x] as usize;
+
+                        if self.keypad[key_code] {
+                            self.pc += 2;
+                        }
+                    },
+                    0xA1 => {
+                        // EXA1: if key in V[X] is not pressed; pc += 2
+                        let x = (instr >> 8) as usize & 0xF;
+                        let key_code = self.V[x] as usize;
+
+                        if !self.keypad[key_code] {
+                            self.pc += 2;
+                        }
+                    },
+                    _ => panic!("opcode does not exist"),
+                }
             }
-            _ => todo!(),
+            _ => {}
         }
     }
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<(), &'static str> {
@@ -339,5 +365,22 @@ impl Cpu {
             .copy_from_slice(rom);
 
         Ok(())
+    }
+    pub fn draw(&self, config: &crate::config::Config) {
+        // Get the display data once
+        let display = self.get_display();
+
+        // Iterate over display pixels
+        for (i, row) in display.iter().enumerate() {
+            for (j, &pixel_on) in row.iter().enumerate() {
+                if pixel_on {
+                    // Create point for drawing
+                    let v = Vec2::create_point(j as f32, i as f32, config);
+
+                    // Draw rectangle representing the pixel
+                    draw_rectangle(v.y, v.x, config.scale_factor, config.scale_factor, WHITE);
+                }
+            }
+        }
     }
 }
