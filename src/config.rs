@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 const SCREEN_WIDTH: f32 = 64.0;
 const SCREEN_HEIGHT: f32 = 32.0;
-const SCALE_FACTOR: f32 = 20.0;
+const SCALE_FACTOR: f32 = 25.0;
 
 pub struct Config {
     screen_height: f32,

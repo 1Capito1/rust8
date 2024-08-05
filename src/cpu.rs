@@ -1,6 +1,7 @@
 // non_snake_case allowed for I and V registers
 use macroquad::prelude::*;
 use crate::vec2::Vec2;
+use crate::instruction::Instruction;
 
 #[allow(non_snake_case)]
 #[allow(dead_code)]
@@ -31,6 +32,15 @@ impl Cpu {
             display: [[false; 32]; 64],
             draw: false
         }
+    }
+
+    pub fn update_timers(&mut self) {
+        if self.delay_timer > 0 { self.delay_timer -= 1 }
+        if self.sound_timer > 0 { self.sound_timer -= 1 }
+    }
+
+    pub fn get_keypad(&mut self) -> &mut [bool; 16] {
+        return &mut self.keypad;
     }
 
     pub fn init() -> Self {
@@ -69,59 +79,66 @@ impl Cpu {
     }
     pub fn update_keypad_state(&mut self) {
         use macroquad::input::KeyCode as KeyCode;
-        use macroquad::input::is_key_down as is_key_down;
+        use macroquad::input::is_key_released as is_key_released;
+        // 1 2 3 4      1 2 3 C
+        // Q W E R      4 5 6 D
+        // A S D F      7 8 9 E
+        // Z X C V      A 0 B F
         self.keypad = [false; 16];
-        if is_key_down(KeyCode::Key1) {
-            self.keypad[0] = true;
-        }
-        if is_key_down(KeyCode::Key2) {
+        if is_key_released(KeyCode::Key1) {
             self.keypad[1] = true;
         }
-        if is_key_down(KeyCode::Key3) {
+        if is_key_released(KeyCode::Key2) {
             self.keypad[2] = true;
         }
-        if is_key_down(KeyCode::Key4) {
+        if is_key_released(KeyCode::Key3) {
             self.keypad[3] = true;
         }
-        if is_key_down(KeyCode::Q) {
+        if is_key_released(KeyCode::Key4) {
+            self.keypad[0xC] = true;
+        }
+
+        if is_key_released(KeyCode::Q) {
             self.keypad[4] = true;
         }
-        if is_key_down(KeyCode::W) {
+        if is_key_released(KeyCode::W) {
             self.keypad[5] = true;
         }
-        if is_key_down(KeyCode::E) {
+        if is_key_released(KeyCode::E) {
             self.keypad[6] = true;
         }
-        if is_key_down(KeyCode::R) {
+        if is_key_released(KeyCode::R) {
+            self.keypad[0xD] = true;
+        }
+
+        if is_key_released(KeyCode::A) {
             self.keypad[7] = true;
         }
-        if is_key_down(KeyCode::A) {
+        if is_key_released(KeyCode::S) {
             self.keypad[8] = true;
         }
-        if is_key_down(KeyCode::S) {
+        if is_key_released(KeyCode::D) {
             self.keypad[9] = true;
         }
-        if is_key_down(KeyCode::D) {
-            self.keypad[10] = true;
+        if is_key_released(KeyCode::F) {
+            self.keypad[0xE] = true;
         }
-        if is_key_down(KeyCode::F) {
-            self.keypad[11] = true;
+
+        if is_key_released(KeyCode::Z) {
+            self.keypad[0xA] = true;
         }
-        if is_key_down(KeyCode::Z) {
-            self.keypad[12] = true;
+        if is_key_released(KeyCode::X) {
+            self.keypad[0] = true;
         }
-        if is_key_down(KeyCode::X) {
-            self.keypad[13] = true;
+        if is_key_released(KeyCode::C) {
+            self.keypad[0xB] = true;
         }
-        if is_key_down(KeyCode::C) {
-            self.keypad[14] = true;
-        }
-        if is_key_down(KeyCode::V) {
-            self.keypad[15] = true;
+        if is_key_released(KeyCode::V) {
+            self.keypad[0xF] = true;
         }
     }
 
-    pub fn fetch_instruction(&mut self) -> u16 {
+    pub fn fetch_instruction(&mut self) -> Instruction {
         let bytes: [u8; 2] = [self.memory[self.pc], self.memory[self.pc + 1]];
         println!("Bytes read: {:02x} {:02x}", bytes[0], bytes[1]);
 
@@ -129,14 +146,14 @@ impl Cpu {
         let result = u16::from_be_bytes(bytes);
         println!("Result {:04x}", result);
         self.pc += 2;
-        return result;
+        return Instruction::new(result);
     }
 
-    pub fn decode(&mut self, instr: u16, config: &crate::config::Config) {
-        let bit_shift = (instr >> 12) & 0x0F;
+    pub fn decode(&mut self, instr: Instruction, config: &crate::config::Config) {
+        let bit_shift = instr.d();
         println!("{bit_shift:x}");
         match bit_shift {
-            0x0 => match instr & 0x0FFF {
+            0x0 => match instr.nnn() {
                 // 0x0E0: clear screen
                 0x0E0 => self.display = [[false; 32]; 64],
                 0x0EE => self.pc = self.stack.pop().expect("ERROR: returning from subroutine that never happened") as usize,
@@ -144,82 +161,78 @@ impl Cpu {
             },
             0x1 => {
                 // 0x1NNN: jump to NNN
-                let address = instr & 0xFFF;
+                let address = instr.nnn();
                 println!("address jump: {:x}", address);
                 self.pc = address as usize;
             },
             0x2 => {
                 // 0x2NNN: call subroutine at NNN, push PC to stack first
                 self.stack.push(self.pc as u16);
-                self.pc = instr as usize & 0xFFF;
+                self.pc = instr.nnn() as usize;
             },
             0x3 => {
                 // 0x3XNN: If VX == NN: pc += 2
-                let x = (instr >> 8) & 0xF;
-                let nn = instr & 0xFF;
-                if x == nn {
+                if self.V[instr.x() as usize] as u16 == instr.nn() {
                     self.pc += 2;
                 }
             },
             0x4 => {
                 // 0x4XNN: If VX != NN: pc += 2
-                let x = (instr >> 8) & 0xF;
-                let nn = instr & 0xFF;
-                if x != nn {
+                if self.V[instr.x() as usize] as u16 != instr.nn() {
                     self.pc += 2;
                 }
             },
             0x5 => {
                 // 0x5XY0: If VX == VY: pc += 2
-                let x = (instr >> 8) as usize & 0xF;
-                let y = (instr >> 4) as usize & 0xF;
+                let x = instr.x() as usize;
+                let y = instr.y() as usize;
                 if self.V[x] == self.V[y] {
                     self.pc += 2;
                 }
             },
             0x6 => {
                 // 0x6XNN: set VX to NN
-                let vx: usize = (instr >> 8) as usize & 0xF;
-                self.V[vx] = (instr & 0xFF) as u8;
-                println!("Set V{:01x} to {:x}", vx, self.V[vx]);
+                let x: usize = instr.x().into();
+                self.V[x] = (instr.nn()) as u8;
+                println!("Set V{:01x} to {:x}", x, self.V[x]);
             },
             0x7 => {
                 // 0x7XNN: add NN to VX
-                let vx: usize = (instr >> 8) as usize & 0xF;
-                self.V[vx] = self.V[vx].overflowing_add((instr & 0xFF) as u8).0;
+                let x: usize = instr.x().into();
+                self.V[x] = self.V[x].overflowing_add(instr.nn() as u8).0;
             },
             0x8 => {
                 // Logic & Arithmetic instructions
-                let bit_shift = instr & 0xF;
+                let bit_shift = instr.n();
                 match bit_shift {
                     0x0 => {
                         // 0x8XY0: VX set to VY
-                        let x = (instr >> 8) as usize & 0xF;
-                        let y = (instr >> 4) as usize & 0xF;
+                        let x = instr.x() as usize;
+                        let y = instr.y() as usize;
                         self.V[x] = self.V[y];
                     },
                     0x1 => {
                         // 8XY1: VX = VX OR VY
-                        let x = (instr >> 8) as usize & 0xF;
-                        let y = (instr >> 4) as usize & 0xF;
+                        let x = instr.x() as usize;
+                        let y = instr.y() as usize;
                         self.V[x] |= self.V[y];
                     },
                     0x2 => {
                         // 8XY2: VX = VX AND VY
-                        let x = (instr >> 8) as usize & 0xF;
-                        let y = (instr >> 4) as usize & 0xF;
+                        let x = instr.x() as usize;
+                        let y = instr.y() as usize;
                         self.V[x] &= self.V[y];
                     },
                     0x3 => {
                         // 8XY3: VX = VX XOR VY
-                        let x = (instr >> 8) as usize & 0xF;
-                        let y = (instr >> 4) as usize & 0xF;
+                        let x = instr.x() as usize;
+                        let y = instr.y() as usize;
                         self.V[x] ^= self.V[y];
                     },
                     0x4 => {
                         // 8XY4: VX = VX ADD VY, if overflow: VF = 1 else VF = 0 
-                        let x = (instr >> 8) as usize & 0xF;
-                        let y = (instr >> 4) as usize & 0xF;
+                        let x = instr.x() as usize;
+                        let y = instr.y() as usize;
                         let carry;
                         (self.V[x], carry) = self.V[x].overflowing_add(self.V[y]);
                         if carry {
@@ -231,8 +244,8 @@ impl Cpu {
                     },
                     0x5 => {
                         // 8XY5: VX = VX - VY, If VX > VY: VF = 1, else VF = 0
-                        let x = (instr >> 8) as usize & 0xF;
-                        let y = (instr >> 4) as usize & 0xF;
+                        let x = instr.x() as usize;
+                        let y = instr.y() as usize;
                         let carry;
                         (self.V[x], carry) = self.V[x].overflowing_sub(self.V[y]);
                         if !carry {
@@ -247,21 +260,25 @@ impl Cpu {
                         // opcode
 
                         // 8XY6: VX bit shift 1 to the right
-                        let x = (instr >> 8) as usize & 0xF;
+                        let x = instr.x() as usize;
+                        let carry = self.V[instr.x() as usize] & 1;
                         self.V[x] >>= 1;
+                        self.V[0xF] = carry;
                     },
                     0xE => {
                         // TODO: When implementing configuration, add the legacy version of this
                         // opcode
 
                         // 8XYE: VX but shift 1 to the left
-                        let x = (instr >> 8) as usize & 0xF;
+                        let x = instr.x() as usize;
+                        let carry = (self.V[x] & 0x80) >> 7;
                         self.V[x] <<= 1;
+                        self.V[0xF] = carry;
                     }
                     0x7 => {
                         // 8XY7: VX = VY - VX, If VY > VX: VF = 1, else VF = 0
-                        let x = (instr >> 8) as usize & 0xF;
-                        let y = (instr >> 4) as usize & 0xF;
+                        let x = instr.x() as usize;
+                        let y = instr.y() as usize;
                         let carry;
                         (self.V[x], carry) = self.V[y].overflowing_sub(self.V[x]);
                         if !carry {
@@ -276,32 +293,32 @@ impl Cpu {
             }
             0x9 => {
                 // 0x9XY0: If VX != VY: pc +=2
-                let x = (instr >> 8) as usize & 0xF;
-                let y = (instr >> 4) as usize & 0xF;
+                let x = instr.x() as usize;
+                let y = instr.y() as usize as usize;
                 if self.V[x] != self.V[y] {
                     self.pc += 2;
                 }
             }
             0xA => {
                 // ANNN: set I to the address of NNN
-                let nnn = instr & 0xFFF;
+                let nnn = instr.nnn();
                 self.I = nnn;
             },
             0xB => {
                 // TODO: When implementing configuration, add the legacy version of this opcode
 
                 // BNNN: PC += V0 + NNN
-                self.pc += (self.V[0] as u16 + (instr & 0xFFF)) as usize;
+                self.pc += (self.V[0] as u16 + (instr.nnn())) as usize;
             },
             0xC => {
                 // CXNN: VX = RandNum & NN
-                let x = (instr >> 8) as usize & 0xF;
-                let nn = instr & 0xFF;
+                let x = instr.x() as usize;
+                let nn = instr.nn();
                 self.V[x] = rand::gen_range(0, u8::MAX) & nn as u8;
             }
             0xD => {
-                let x = (instr >> 8) as usize & 0xF;
-                let y = (instr >> 4) as usize & 0xF;
+                let x = instr.x() as usize;
+                let y = instr.y() as usize as usize;
 
                 let mut x_coord = self.V[x] as usize % config.get_raw_width() as usize;
                 let mut y_coord = self.V[y] as usize % config.get_raw_height() as usize;
@@ -309,7 +326,7 @@ impl Cpu {
 
                 self.V[0xF] = 0;
 
-                let n = instr & 0xF;
+                let n = instr.n();
                 for i in 0..n {
                     let sprite_data = self.memory[self.I as usize + i as usize];
                     x_coord = original_x;
@@ -329,11 +346,11 @@ impl Cpu {
                 self.set_draw(true);
             },
             0xE => {
-                let bitmask = instr & 0xFF;
+                let bitmask = instr.nn();
                 match bitmask {
                     0x9E => {
                         // EX9E: if key in V[X] is pressed; pc += 2
-                        let x = (instr >> 8) as usize & 0xF;
+                        let x = instr.x() as usize;
                         let key_code = self.V[x] as usize;
 
                         if self.keypad[key_code] {
@@ -342,81 +359,81 @@ impl Cpu {
                     },
                     0xA1 => {
                         // EXA1: if key in V[X] is not pressed; pc += 2
-                        let x = (instr >> 8) as usize & 0xF;
+                        let x = instr.x() as usize;
                         let key_code = self.V[x] as usize;
 
                         if !self.keypad[key_code] {
                             self.pc += 2;
                         }
                     },
-                    0xF => {
-                        let bitmask = instr & 0xFF;
-                        match bitmask {
-                            0x07 => {
-                                // FX07: V[X] = delay_timer
-                                let x = (instr >> 8) as usize & 0xF;
-                                self.V[x] = self.delay_timer;
-                            },
-                            0x15 => {
-                                // FX15: delay_timer = V[X]
-                                let x = (instr >> 8) as usize & 0xF;
-                                self.delay_timer = self.V[x];
-                            },
-                            0x18 => {
-                                // FX18: sound_timer = VX
-                                let x = (instr >> 8) as usize & 0xF;
-                                self.sound_timer = self.V[x];
-                            },
-                            0x1E => {
-                                // FX1E: I += V[X]
-                                let x = (instr >> 8) as usize & 0xF;
-                                self.I += self.V[x] as u16;
-                            },
-                            0x0A => {
-                                // FX0A: VX = get_key(); Await until a keypress and store in VX
-                                let x = (instr >> 8) as usize & 0xF;
-                                let mut any_key_pressed = false;
-                                for (i, _) in self.keypad.iter().enumerate() {
-                                    if self.keypad[i] {
-                                        self.V[x] = i as u8;
-                                        any_key_pressed = true;
-                                        break;
-                                    }
-                                }
-                                if !any_key_pressed {
-                                    self.pc -= 2;
-                                }
-
-                            },
-                            0x29 => {
-                                // FX29: I = V[X] * 5
-                                let x = (instr >> 8) as usize & 0xF;
-                                self.I = self.V[x] as u16 * 5;
-                            },
-                            0x33 => {
-                                // FX33: VX -> three decimal digits, stored at memory[I]
-                                let x = (instr >> 8) as usize & 0xF;
-                                self.memory[self.I as usize + 2] = self.V[x] % 10;
-                                self.memory[self.I as usize + 1] = self.V[x] / 10 % 10;
-                                self.memory[self.I as usize] = self.V[x] / 10 / 10 % 10;
-                            },
-                            0x55 => {
-                                // FX55: V0 -> VX stored in memory[I] -> memory[I+X]
-                                let x = (instr >> 8) as usize & 0xF;
-                                for i in 0..=x {
-                                    self.memory[self.I as usize + i] = self.V[i];
-                                }
-                            },
-                            0x65 => {
-                                let x = (instr >> 8) as usize & 0xF;
-                                for i in 0..=x {
-                                    self.V[i] = self.memory[self.I as usize + i];
-                                }
-                            },
-                            _ => panic!("Opcode does not exist"),
-                        }
-                    }
                     _ => panic!("opcode does not exist"),
+                }
+            },
+            0xF => {
+                let bitmask = instr.nn();
+                match bitmask {
+                    0x07 => {
+                        // FX07: V[X] = delay_timer
+                        let x = instr.x() as usize;
+                        self.V[x] = self.delay_timer;
+                    },
+                    0x15 => {
+                        // FX15: delay_timer = V[X]
+                        self.delay_timer = self.V[instr.x() as usize];
+                    },
+                    0x18 => {
+                        // FX18: sound_timer = VX
+                        let x = instr.nn() as usize;
+                        self.sound_timer = self.V[x];
+                    },
+                    0x1E => {
+                        // FX1E: I += V[X]
+                        let x = instr.x() as usize;
+                        self.I += self.V[x] as u16;
+                    },
+                    0x0A => {
+                        // FX0A: VX = get_key(); Await until a keypress and store in VX
+                        let x = instr.x() as usize;
+                        let mut any_key_pressed = false;
+                        for (i, _) in self.keypad.iter().enumerate() {
+                            if self.keypad[i] {
+                                self.V[x] = i as u8;
+                                any_key_pressed = true;
+                                break;
+                            }
+                        }
+                        if !any_key_pressed {
+                            self.pc -= 2;
+                        }
+
+                    },
+                    0x29 => {
+                        // FX29: I = V[X] * 5
+                        let x = instr.x() as usize;
+                        self.I = self.V[x] as u16 * 5;
+                    },
+                    0x33 => {
+                        // FX33: VX -> three decimal digits, stored at memory[I]
+                        let mut bcd = self.V[instr.x() as usize];
+                        self.memory[self.I as usize + 2] = bcd % 10;
+                        bcd /= 10;
+                        self.memory[self.I as usize + 1] = bcd % 10;
+                        bcd /= 10;
+                        self.memory[self.I as usize] = bcd;
+                    },
+                    0x55 => {
+                        // FX55: V0 -> VX stored in memory[I] -> memory[I+X]
+                        let dump = &self.V[0..=instr.x() as usize];
+                        self.memory[self.I as usize..=self.I as usize + instr.x() as usize]
+                            .copy_from_slice(dump);
+                    },
+                    0x65 => {
+                        let x = instr.x() as usize;
+                        for i in 0..=x {
+                            self.V[i] = self.memory[self.I as usize + i];
+                        }
+                    },
+                    _ => panic!("Opcode does not exist"),
                 }
             }
             _ => {}
@@ -449,5 +466,56 @@ impl Cpu {
                 }
             }
         }
+    }
+}
+
+
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// TEST
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config;
+
+    #[test]
+    fn test_fx55() {
+        let mut chip8 = Cpu::new();
+        chip8.I = 0x400; // Set I to some address
+        chip8.V[0] = 0x01;
+        chip8.V[1] = 0x02;
+        chip8.V[2] = 0x03;
+        chip8.V[3] = 0x04; // Add additional registers if needed
+
+        // Instruction FX55 where X is 2 (store V0 to V2)
+        let instr = Instruction::new(0xF255); 
+        let config = config::Config::default();
+        chip8.decode(instr, &config);
+
+        // Assert memory content
+        assert_eq!(chip8.memory[0x400], 0x01);
+        assert_eq!(chip8.memory[0x401], 0x02);
+        assert_eq!(chip8.memory[0x402], 0x03);
+
+        // Check that memory beyond the affected range is not altered
+        assert_ne!(chip8.memory[0x403], 0x04);
+    }
+#[test]
+    fn test_fx33() {
+        let mut chip8 = Cpu::new();
+        chip8.I = 0x300; // Set I to some address
+        chip8.V[1] = 123; // Set V1 to 123
+
+        // Instruction FX33 where X is 1 (convert V1 to BCD and store at I)
+        let instr = Instruction::new(0xF133);
+        let config = config::Config::default();
+        chip8.decode(instr, &config);
+
+        // Assert memory content
+        assert_eq!(chip8.memory[0x300], 1); // Hundreds place
+        assert_eq!(chip8.memory[0x301], 2); // Tens place
+        assert_eq!(chip8.memory[0x302], 3); // Units place
     }
 }

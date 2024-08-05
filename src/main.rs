@@ -1,3 +1,4 @@
+mod instruction;
 mod config;
 mod cpu;
 mod vec2;
@@ -9,7 +10,7 @@ use std::io::Read;
 async fn main() -> std::io::Result<()> {
     let config = config::Config::default();
     let mut cpu = cpu::Cpu::init();
-    let mut f = File::open("src/roms/test_opcode.ch8")?;
+    let mut f = File::open("src/roms/6-keypad.ch8")?;
     let mut rom: Vec<u8> = Vec::new();
     let _ = f.read_to_end(&mut rom)?;
     cpu.load_rom(&rom).expect("File size 0");
@@ -17,6 +18,7 @@ async fn main() -> std::io::Result<()> {
     clear_background(BLACK);
     while !(is_key_pressed(KeyCode::Escape) || macroquad::input::is_quit_requested()) {
         cpu.update_keypad_state();
+        cpu.update_timers();
         // Fetch instruction from memory at current PC
         let instruction = cpu.fetch_instruction();
         // Decode the instruction and execute
