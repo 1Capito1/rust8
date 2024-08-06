@@ -85,56 +85,109 @@ impl Cpu {
         // A S D F      7 8 9 E
         // Z X C V      A 0 B F
         self.keypad = [false; 16];
-        if is_key_released(KeyCode::Key1) {
+        if is_key_down(KeyCode::Key1) {
             self.keypad[1] = true;
         }
-        if is_key_released(KeyCode::Key2) {
+        if is_key_down(KeyCode::Key2) {
             self.keypad[2] = true;
         }
-        if is_key_released(KeyCode::Key3) {
+        if is_key_down(KeyCode::Key3) {
             self.keypad[3] = true;
         }
-        if is_key_released(KeyCode::Key4) {
+        if is_key_down(KeyCode::Key4) {
             self.keypad[0xC] = true;
         }
 
-        if is_key_released(KeyCode::Q) {
+        if is_key_down(KeyCode::Q) {
             self.keypad[4] = true;
         }
-        if is_key_released(KeyCode::W) {
+        if is_key_down(KeyCode::W) {
             self.keypad[5] = true;
         }
-        if is_key_released(KeyCode::E) {
+        if is_key_down(KeyCode::E) {
             self.keypad[6] = true;
         }
-        if is_key_released(KeyCode::R) {
+        if is_key_down(KeyCode::R) {
             self.keypad[0xD] = true;
         }
 
-        if is_key_released(KeyCode::A) {
+        if is_key_down(KeyCode::A) {
             self.keypad[7] = true;
         }
-        if is_key_released(KeyCode::S) {
+        if is_key_down(KeyCode::S) {
             self.keypad[8] = true;
         }
-        if is_key_released(KeyCode::D) {
+        if is_key_down(KeyCode::D) {
             self.keypad[9] = true;
         }
-        if is_key_released(KeyCode::F) {
+        if is_key_down(KeyCode::F) {
             self.keypad[0xE] = true;
         }
 
-        if is_key_released(KeyCode::Z) {
+        if is_key_down(KeyCode::Z) {
             self.keypad[0xA] = true;
         }
-        if is_key_released(KeyCode::X) {
+        if is_key_down(KeyCode::X) {
             self.keypad[0] = true;
         }
-        if is_key_released(KeyCode::C) {
+        if is_key_down(KeyCode::C) {
             self.keypad[0xB] = true;
         }
-        if is_key_released(KeyCode::V) {
+        if is_key_down(KeyCode::V) {
             self.keypad[0xF] = true;
+        }
+
+        // released
+        if is_key_released(KeyCode::Key1) {
+            self.keypad[1] = false;
+        }
+        if is_key_released(KeyCode::Key2) {
+            self.keypad[2] = false;
+        }
+        if is_key_released(KeyCode::Key3) {
+            self.keypad[3] = false;
+        }
+        if is_key_released(KeyCode::Key4) {
+            self.keypad[0xC] = false;
+        }
+
+        if is_key_released(KeyCode::Q) {
+            self.keypad[4] = false;
+        }
+        if is_key_released(KeyCode::W) {
+            self.keypad[5] = false;
+        }
+        if is_key_released(KeyCode::E) {
+            self.keypad[6] = false;
+        }
+        if is_key_released(KeyCode::R) {
+            self.keypad[0xD] = false;
+        }
+
+        if is_key_released(KeyCode::A) {
+            self.keypad[7] = false;
+        }
+        if is_key_released(KeyCode::S) {
+            self.keypad[8] = false;
+        }
+        if is_key_released(KeyCode::D) {
+            self.keypad[9] = false;
+        }
+        if is_key_released(KeyCode::F) {
+            self.keypad[0xE] = false;
+        }
+
+        if is_key_released(KeyCode::Z) {
+            self.keypad[0xA] = false;
+        }
+        if is_key_released(KeyCode::X) {
+            self.keypad[0] = false;
+        }
+        if is_key_released(KeyCode::C) {
+            self.keypad[0xB] = false;
+        }
+        if is_key_released(KeyCode::V) {
+            self.keypad[0xF] = false;
         }
     }
 
@@ -455,6 +508,7 @@ impl Cpu {
         let display = self.get_display();
 
         // Iterate over display pixels
+        macroquad::prelude::scene::clear();
         for (i, row) in display.iter().enumerate() {
             for (j, &pixel_on) in row.iter().enumerate() {
                 if pixel_on {

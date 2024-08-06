@@ -7,3 +7,6 @@ edition = "2021"
 macroquad = "0.4.11"
 num-traits = "0.2.19"
 rand = "0.8.5"
+
+[profile.release]
+debug = true
