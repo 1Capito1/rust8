@@ -2,6 +2,7 @@
 use macroquad::prelude::*;
 use crate::vec2::Vec2;
 use crate::instruction::Instruction;
+use rodio::Source;
 
 #[allow(non_snake_case)]
 #[allow(dead_code)]
@@ -14,8 +15,9 @@ pub struct Cpu {
     sound_timer: u8,
     V: [u8; 16],
     keypad: [bool; 16],
+    keypad_clone: [bool; 16],
     display: [[bool; 32]; 64],
-    draw: bool
+    draw: bool,
 }
 
 impl Cpu {
@@ -29,18 +31,23 @@ impl Cpu {
             sound_timer: 0,
             V: [0; 16],
             keypad: [false; 16],
+            keypad_clone: [false; 16],
             display: [[false; 32]; 64],
-            draw: false
+            draw: false,
         }
+    }
+
+    fn play_sound() {
+        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+        let file = std::io::BufReader::new(std::fs::File::open("beep.wav").unwrap());
+        let source = rodio::Decoder::new(file).unwrap();
+        let _ = stream_handle.play_raw(source.convert_samples());
     }
 
     pub fn update_timers(&mut self) {
         if self.delay_timer > 0 { self.delay_timer -= 1 }
         if self.sound_timer > 0 { self.sound_timer -= 1 }
-    }
-
-    pub fn get_keypad(&mut self) -> &mut [bool; 16] {
-        return &mut self.keypad;
+        // else if self.sound_timer == 1 { Self::play_sound() }
     }
 
     pub fn init() -> Self {
@@ -193,18 +200,13 @@ impl Cpu {
 
     pub fn fetch_instruction(&mut self) -> Instruction {
         let bytes: [u8; 2] = [self.memory[self.pc], self.memory[self.pc + 1]];
-        println!("Bytes read: {:02x} {:02x}", bytes[0], bytes[1]);
-
-
         let result = u16::from_be_bytes(bytes);
-        println!("Result {:04x}", result);
         self.pc += 2;
         return Instruction::new(result);
     }
 
     pub fn decode(&mut self, instr: Instruction, config: &crate::config::Config) {
         let bit_shift = instr.d();
-        println!("{bit_shift:x}");
         match bit_shift {
             0x0 => match instr.nnn() {
                 // 0x0E0: clear screen
@@ -215,7 +217,6 @@ impl Cpu {
             0x1 => {
                 // 0x1NNN: jump to NNN
                 let address = instr.nnn();
-                println!("address jump: {:x}", address);
                 self.pc = address as usize;
             },
             0x2 => {
@@ -247,7 +248,6 @@ impl Cpu {
                 // 0x6XNN: set VX to NN
                 let x: usize = instr.x().into();
                 self.V[x] = (instr.nn()) as u8;
-                println!("Set V{:01x} to {:x}", x, self.V[x]);
             },
             0x7 => {
                 // 0x7XNN: add NN to VX
@@ -370,6 +370,7 @@ impl Cpu {
                 self.V[x] = rand::gen_range(0, u8::MAX) & nn as u8;
             }
             0xD => {
+                // DXYN: draw to screen
                 let x = instr.x() as usize;
                 let y = instr.y() as usize as usize;
 
@@ -386,12 +387,11 @@ impl Cpu {
 
                     for j in (0..8).rev() {
                         let pixel: &mut bool = &mut self.display[x_coord][y_coord];
-                        let sprite_bit = (sprite_data & (1 << j)) != 0; // Use != 0 for clarity
+                        let sprite_bit = (sprite_data & (1 << j)) != 0;
                         if *pixel && sprite_bit {
-                            *pixel = false;
                             self.V[0xF] = 1;
                         }
-                        *pixel ^= sprite_bit;
+                        *pixel = *pixel ^ sprite_bit;
                         x_coord = (x_coord + 1) % config.get_raw_width() as usize; // Wrap around
                     }
                     y_coord = (y_coord + 1) % config.get_raw_height() as usize; // Wrap around
@@ -436,7 +436,7 @@ impl Cpu {
                     },
                     0x18 => {
                         // FX18: sound_timer = VX
-                        let x = instr.nn() as usize;
+                        let x = instr.x() as usize;
                         self.sound_timer = self.V[x];
                     },
                     0x1E => {

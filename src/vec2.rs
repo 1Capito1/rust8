@@ -7,6 +7,7 @@ pub struct Vec2 {
 
 impl Vec2 {
     // multiplies points by scale factor, effecitively
+    #[inline]
     pub fn create_point(x: f32, y: f32, conf: &config::Config) -> Self {
         Self {
             x: x * conf.scale_factor,

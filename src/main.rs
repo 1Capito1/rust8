@@ -10,13 +10,13 @@ use std::io::Read;
 async fn main() -> std::io::Result<()> {
     let config = config::Config::default();
     let mut cpu = cpu::Cpu::init();
-    let mut f = File::open("src/roms/PONG")?;
+    let mut f = File::open("src/roms/tetris.ch8")?;
     let mut rom: Vec<u8> = Vec::new();
     let _ = f.read_to_end(&mut rom)?;
     cpu.load_rom(&rom).expect("File size 0");
     request_new_screen_size(config.get_scaled_width(), config.get_scaled_height());
-    while !(is_key_pressed(KeyCode::Escape) || macroquad::input::is_quit_requested()) {
-    clear_background(BLACK);
+    while !(is_key_pressed(KeyCode::Escape) || macroquad::input::is_quit_requested()) {  
+        clear_background(BLACK);
         cpu.update_keypad_state();
         let start = std::time::Instant::now();
 
