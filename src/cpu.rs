@@ -2,7 +2,6 @@
 use macroquad::prelude::*;
 use crate::vec2::Vec2;
 use crate::instruction::Instruction;
-use rodio::Source;
 
 #[allow(non_snake_case)]
 #[allow(dead_code)]
@@ -37,17 +36,25 @@ impl Cpu {
         }
     }
 
+    #[allow(unused_must_use)]
     fn play_sound() {
-        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
-        let file = std::io::BufReader::new(std::fs::File::open("beep.wav").unwrap());
-        let source = rodio::Decoder::new(file).unwrap();
-        let _ = stream_handle.play_raw(source.convert_samples());
+        use kira::{
+            manager::{
+                AudioManager, AudioManagerSettings,
+                backend::DefaultBackend,
+            },
+            sound::static_sound::StaticSoundData,
+        };
+
+        let mut manager = AudioManager::<DefaultBackend>::new(AudioManagerSettings::default()).expect("Audio Playback error");
+        let sound_data = StaticSoundData::from_file("beep.wav").expect("Audio Playback error");
+        manager.play(sound_data.clone());
     }
 
     pub fn update_timers(&mut self) {
         if self.delay_timer > 0 { self.delay_timer -= 1 }
         if self.sound_timer > 0 { self.sound_timer -= 1 }
-        // else if self.sound_timer == 1 { Self::play_sound() }
+        else if self.sound_timer == 1 { Self::play_sound() }
     }
 
     pub fn init() -> Self {

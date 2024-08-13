@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.5.15", features = ["derive"] }
+kira = "0.9.4"
 macroquad = "0.4.11"
 num-traits = "0.2.19"
 rand = "0.8.5"
-rodio = "0.19.0"
 
 [profile.release]
 debug = true

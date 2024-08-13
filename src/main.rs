@@ -2,32 +2,41 @@ mod instruction;
 mod config;
 mod cpu;
 mod vec2;
+mod args;
 use macroquad::prelude::*;
-use std::fs::File;
+use std::error::Error;
 use std::io::Read;
 
 #[macroquad::main("BasicShapes")]
-async fn main() -> std::io::Result<()> {
-    let config = config::Config::default();
+async fn main() -> Result<(), Box<dyn Error>> {
+    let mut config = config::Config::default();
+    if let Err(e) = args::pass_args(&mut config) {
+        eprintln!("{e}");
+        return Err(Box::new(e));
+    }
+
     let mut cpu = cpu::Cpu::init();
-    let mut f = File::open("src/roms/tetris.ch8")?;
     let mut rom: Vec<u8> = Vec::new();
-    let _ = f.read_to_end(&mut rom)?;
+    let _ = config.file_path
+        .as_ref()
+        .unwrap()
+        .read_to_end(&mut rom)?;
     cpu.load_rom(&rom).expect("File size 0");
+
     request_new_screen_size(config.get_scaled_width(), config.get_scaled_height());
     while !(is_key_pressed(KeyCode::Escape) || macroquad::input::is_quit_requested()) {  
         clear_background(BLACK);
         cpu.update_keypad_state();
-        let start = std::time::Instant::now();
 
+        let start = std::time::Instant::now();
         // Fetch instruction from memory at current PC
-        for _ in 0..700/60 {
+        for _ in 0..config.instr_per_second {
             let instruction = cpu.fetch_instruction();
             // Decode the instruction and execute
             cpu.decode(instruction, &config);
         }
-
         let elapsed = start.elapsed();
+
         let sleep_duration = if 16.67 > elapsed.as_millis() as f32 {16.67 - elapsed.as_millis() as f32 / 1000.0} else {0.0} as u64;
         std::thread::sleep(std::time::Duration::from_millis(sleep_duration));
 
