@@ -316,8 +316,9 @@ impl Cpu {
                         }
                     },
                     0x6 => {
-                        // TODO: When implementing configuration, add the legacy version of this
-                        // opcode
+                        if config.legacy {
+                            self.V[instr.x() as usize] = self.V[instr.y() as usize];
+                        }
 
                         // 8XY6: VX bit shift 1 to the right
                         let x = instr.x() as usize;
@@ -326,8 +327,9 @@ impl Cpu {
                         self.V[0xF] = carry;
                     },
                     0xE => {
-                        // TODO: When implementing configuration, add the legacy version of this
-                        // opcode
+                        if config.legacy {
+                            self.V[instr.x() as usize] = self.V[instr.y() as usize];
+                        }
 
                         // 8XYE: VX but shift 1 to the left
                         let x = instr.x() as usize;
@@ -366,6 +368,11 @@ impl Cpu {
             },
             0xB => {
                 // TODO: When implementing configuration, add the legacy version of this opcode
+                if config.bxnn_quirk {
+                    // BXNN (QUIRK: UNINTENDED BEHAVIOUR, MAY NOT WORK IN SOME ROMS): 
+                    // PC += XNN + V[x]
+                    self.pc += (instr.nnn() + self.V[instr.x() as usize] as u16) as usize;
+                }
 
                 // BNNN: PC += V0 + NNN
                 self.pc += (self.V[0] as u16 + (instr.nnn())) as usize;
@@ -486,11 +493,21 @@ impl Cpu {
                         let dump = &self.V[0..=instr.x() as usize];
                         self.memory[self.I as usize..=self.I as usize + instr.x() as usize]
                             .copy_from_slice(dump);
+                        // legacy version would increment I as it ran, ending with a value of 
+                        // I + X + 1
+                        if config.legacy {
+                            self.I = self.I + instr.x() as u16 + 1;
+                        }
                     },
                     0x65 => {
                         let x = instr.x() as usize;
                         for i in 0..=x {
                             self.V[i] = self.memory[self.I as usize + i];
+                        }
+                        // legacy version would increment I as it ran, ending with a value of 
+                        // I + X + 1
+                        if config.legacy {
+                            self.I = self.I + instr.x() as u16 + 1;
                         }
                     },
                     _ => panic!("Opcode does not exist"),

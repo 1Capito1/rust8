@@ -13,7 +13,14 @@ struct Args {
 
     // Speed of the emulator, default 700/60 instr_per_second
     #[arg(short, long, default_value_t = INSTR_PER_SECOND_DEFAULT)]
-    instr_per_second: u32
+    instr_per_second: u32,
+
+    // determines if it uses the legacy version of certain opcodes or not
+    #[arg(short, long, default_value_t = false)]
+    legacy: bool,
+
+    #[arg(short, long, default_value_t = false)]
+    bxnn_quirk: bool,
 }
 
 
@@ -31,6 +38,10 @@ pub fn pass_args(config: &mut config::Config) -> Result<(), ArgsError> {
         return Err(ArgsError::BadFlag);
     }
     config.instr_per_second = args.instr_per_second / 60;
+
+    config.legacy = args.legacy;
+    
+    config.bxnn_quirk = args.bxnn_quirk;
 
     Ok(())
 }

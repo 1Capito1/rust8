@@ -13,6 +13,8 @@ pub struct Config {
     // Emulator config
     pub file_path: Result<File, std::io::Error>,
     pub instr_per_second: u32,
+    pub legacy: bool,
+    pub bxnn_quirk: bool,
 }
 
 impl Config {
@@ -43,6 +45,8 @@ impl std::default::Default for Config {
             scale_factor: SCALE_FACTOR,
             file_path: File::open("Unknown Path"),
             instr_per_second: 0,
+            legacy: false,
+            bxnn_quirk: false,
         }
     }
 }
