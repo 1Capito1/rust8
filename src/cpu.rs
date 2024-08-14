@@ -381,6 +381,10 @@ impl Cpu {
                 // CXNN: VX = RandNum & NN
                 let x = instr.x() as usize;
                 let nn = instr.nn();
+                let sys_time = std::time::SystemTime::now();
+                rand::srand(sys_time.duration_since(std::time::UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_nanos() as u64);
                 self.V[x] = rand::gen_range(0, u8::MAX) & nn as u8;
             }
             0xD => {

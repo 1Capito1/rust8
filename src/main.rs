@@ -1,4 +1,5 @@
 mod instruction;
+mod opcodes;
 mod config;
 mod cpu;
 mod vec2;
@@ -37,7 +38,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         let elapsed = start.elapsed();
 
-        let sleep_duration = if 16.67 > elapsed.as_millis() as f32 {16.67 - elapsed.as_millis() as f32 / 1000.0} else {0.0} as u64;
+        let hz = hz_from_millis(config.frame_rate);
+
+        let sleep_duration = if hz > elapsed.as_millis() as f32 {hz - elapsed.as_millis() as f32 / 1000.0} else {0.0} as u64;
         std::thread::sleep(std::time::Duration::from_millis(sleep_duration));
 
         if cpu.will_draw() {
@@ -49,5 +52,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         next_frame().await
     }
     Ok(())
+}
+
+fn hz_from_millis(hz: f32) -> f32 {
+    1.0 / hz * 1000.0
 }
 

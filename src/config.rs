@@ -15,6 +15,7 @@ pub struct Config {
     pub instr_per_second: u32,
     pub legacy: bool,
     pub bxnn_quirk: bool,
+    pub frame_rate: f32,
 }
 
 impl Config {
@@ -47,6 +48,7 @@ impl std::default::Default for Config {
             instr_per_second: 0,
             legacy: false,
             bxnn_quirk: false,
+            frame_rate: 60.0,
         }
     }
 }

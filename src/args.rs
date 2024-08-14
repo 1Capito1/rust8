@@ -2,7 +2,7 @@ use clap::Parser;
 use crate::config;
 use std::error::Error;
 
-const INSTR_PER_SECOND_DEFAULT: u32 = 700/60;
+const INSTR_PER_SECOND_DEFAULT: u32 = 700;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -21,6 +21,12 @@ struct Args {
 
     #[arg(short, long, default_value_t = false)]
     bxnn_quirk: bool,
+
+    #[arg(short, long)]
+    scale_factor: Option<f32>,
+
+    #[arg(long)]
+    frame_rate: Option<f32>,
 }
 
 
@@ -34,6 +40,7 @@ pub fn pass_args(config: &mut config::Config) -> Result<(), ArgsError> {
     }
     config.file_path = Ok(f.unwrap());
 
+    println!("{}", args.instr_per_second);
     if args.instr_per_second < 60 {
         return Err(ArgsError::BadFlag);
     }
@@ -42,6 +49,14 @@ pub fn pass_args(config: &mut config::Config) -> Result<(), ArgsError> {
     config.legacy = args.legacy;
     
     config.bxnn_quirk = args.bxnn_quirk;
+
+    if let Some(scale_factor) = args.scale_factor {
+        config.scale_factor = scale_factor;
+    }
+
+    if let Some(frame_rate) = args.frame_rate {
+        config.frame_rate = frame_rate;
+    }
 
     Ok(())
 }
